@@ -1,6 +1,6 @@
 #include "adminwindow.h"
-#include "student.h"
-#include "course.h"
+#include "teacher.h"
+#include "teacherlist.h"
 
 #include <QVBoxLayout>
 #include <QPushButton>
@@ -41,13 +41,51 @@ static int largeGetInt(QWidget* parent,
     return dlg.intValue();
 }
 
-AdminWindow::AdminWindow(StudentList* students, Course** courseHead, QWidget* parent)
-    : QDialog(parent), m_students(students), m_courseHead(courseHead)
+AdminWindow::AdminWindow(StudentList* students,
+                         Course** courseHead,
+                         TeacherList* teachers,
+                         QWidget* parent)
+    : QDialog(parent)
+    , m_students(students)
+    , m_courseHead(courseHead)
+    , m_teachers(teachers)
 {
     setWindowTitle("Admin Panel");
     setMinimumSize(600, 400);
     resize(700, 500);
+    m_students->addStudent(new Student("sam",    "S01", "sam@x","123"));
+    m_students->addStudent(new Student("john",   "J02", "john@x","123"));
+    m_students->addStudent(new Student("mark",   "M03", "mark@x","123"));
+    m_students->addStudent(new Student("henry",  "H04", "henry@x","123"));
+    m_students->addStudent(new Student("selena", "S05", "selena@x","123"));
+    // ── seed 5 courses ─────────────────────────────────────
+    struct C { const char* id; const char* title; const char* ts; };
+    C initCourses[] = {
+        {"CSE101","Intro to CSE","Mon 9:00-11:00"},
+        {"EEE102","Basic EEE",    "Tue 9:00-11:00"},
+        {"BIO103","Fundamentals of Biology","Wed 9:00-11:00"},
+        {"CHEM104","General Chemistry","Thu 9:00-11:00"},
+        {"MATH105","Calculus I",  "Fri 9:00-11:00"}
+    };
+    for (auto &cc : initCourses) {
+        Course* c = new Course(cc.id, cc.title, 3, 30, cc.ts);
+        c->next = *m_courseHead;
+        *m_courseHead = c;
+    }
 
+    // ── seed 5 teachers ────────────────────────────────────
+    struct T { const char* id; const char* name; };
+    T initTeachers[] = {
+        {"T01","Alice"}, {"T02","Bob"}, {"T03","Carol"},
+        {"T04","Dave"},  {"T05","Eve"}
+    };
+    for (auto &tt : initTeachers) {
+        Teacher* t = new Teacher(tt.id, "123");
+        t->next = m_teachers->head;
+        m_teachers->head = t;
+    }
+
+    // ── build buttons ──────────────────────────────────────
     auto v = new QVBoxLayout(this);
     struct Btn { const char* txt; void (AdminWindow::*slot)(); };
     Btn buttons[] = {
@@ -60,11 +98,18 @@ AdminWindow::AdminWindow(StudentList* students, Course** courseHead, QWidget* pa
         {"View Enrolled Students",    &AdminWindow::viewEnrolledStudents},
         {"View All Courses",          &AdminWindow::viewAllCourses},
         {"Add Course to Student",     &AdminWindow::addCourseToStudent},
-        {"Remove Student from Course",&AdminWindow::removeStudentFromCourse}
+        {"Remove Student from Course",&AdminWindow::removeStudentFromCourse},
+        {"Add Teacher",               &AdminWindow::addTeacher},
+        {"Remove Teacher",            &AdminWindow::removeTeacher},
+        {"Assign Course to Teacher",  &AdminWindow::assignCourseToTeacher},
+        {"View Teacher Courses",      &AdminWindow::viewTeacherCourses}
     };
+
+    QSize btnSize(140,30);
     for (auto &b : buttons) {
         QPushButton* btn = new QPushButton(b.txt);
-        v->addWidget(btn);
+        btn->setFixedSize(btnSize);
+        v->addWidget(btn, 0, Qt::AlignHCenter);
         connect(btn, &QPushButton::clicked, this, b.slot);
     }
 }
@@ -223,4 +268,60 @@ void AdminWindow::removeStudentFromCourse() {
 
     s->removeCourse(cid);
     showMessage("Unenroll Student", "Done.");
+}
+
+// — Add Teacher —
+void AdminWindow::addTeacher() {
+    QString id = largeGetText(this,"Add Teacher","Teacher ID:");
+    if (id.isEmpty()) return;
+    if (m_teachers->findById(id)) { showMessage("Error","Teacher exists"); return; }
+    QString pw = largeGetText(this,"Add Teacher","Password:", true);
+    if (pw.isEmpty()) return;
+    m_teachers->addTeacher(new Teacher(id,pw));
+    showMessage("Add Teacher","Teacher added.");
+}
+
+// — Remove Teacher —
+void AdminWindow::removeTeacher() {
+    QString id = largeGetText(this,"Remove Teacher","Teacher ID:");
+    if (id.isEmpty()) return;
+    Teacher* p = m_teachers->head; Teacher* prev=nullptr;
+    while(p) {
+        if (p->getId()==id) {
+            if(prev) prev->next=p->next; else m_teachers->head=p->next;
+            delete p;
+            showMessage("Remove Teacher","Teacher removed.");
+            return;
+        }
+        prev=p; p=p->next;
+    }
+    showMessage("Remove Teacher","Not found.");
+}
+
+// — Assign Course to Teacher —
+void AdminWindow::assignCourseToTeacher() {
+    QString tid = largeGetText(this,"Assign to Teacher","Teacher ID:");
+    if (tid.isEmpty()) return;
+    Teacher* t = m_teachers->findById(tid);
+    if (!t) { showMessage("Error","Teacher not found"); return; }
+
+    QString cid = largeGetText(this,"Assign to Teacher","Course ID:");
+    if (cid.isEmpty()) return;
+    Course* c=nullptr;
+    for (Course* p=*m_courseHead; p; p=p->next) if(p->getId()==cid){c=p;break;}
+    if(!c){ showMessage("Error","Course not found"); return; }
+
+    t->assignCourse(c);
+    showMessage("Assign Course","Done.");
+}
+
+// — View Teacher Courses —
+void AdminWindow::viewTeacherCourses() {
+    QString tid = largeGetText(this,"View Teacher Courses","Teacher ID:");
+    if (tid.isEmpty()) return;
+    Teacher* t = m_teachers->findById(tid);
+    if (!t) { showMessage("Error","Teacher not found"); return; }
+
+    QString out; t->viewCourses(out);
+    showMessage("Courses of "+tid, out.isEmpty()? "(none)" : out);
 }
