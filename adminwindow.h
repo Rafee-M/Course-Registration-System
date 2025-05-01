@@ -2,16 +2,21 @@
 #define ADMINWINDOW_H
 
 #include <QDialog>
-class StudentList;
-class Course;
-class QPushButton;
+#include "student.h"
+#include "course.h"
+#include "teacherlist.h"
 
 class AdminWindow : public QDialog {
     Q_OBJECT
+
 public:
-    AdminWindow(StudentList* students, Course** courseHead, QWidget* parent = nullptr);
+    explicit AdminWindow(StudentList* students,
+                         Course** courseHead,
+                         TeacherList* teachers,
+                         QWidget* parent = nullptr);
 
 private slots:
+    // Student/Course management
     void addCourse();
     void removeCourse();
     void addStudent();
@@ -22,11 +27,17 @@ private slots:
     void viewAllCourses();
     void addCourseToStudent();
     void removeStudentFromCourse();
+    // Teacher management
+    void addTeacher();
+    void removeTeacher();
+    void assignCourseToTeacher();
+    void viewTeacherCourses();
 
 private:
     StudentList* m_students;
     Course**     m_courseHead;
-    // no persistent line-edits here — we’ll use QInputDialog in each slot
+    TeacherList* m_teachers;
+
     void showMessage(const QString& title, const QString& msg);
 };
 
