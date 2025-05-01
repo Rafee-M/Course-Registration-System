@@ -4,58 +4,73 @@
 #include <QVBoxLayout>
 #include <QInputDialog>
 #include <QMessageBox>
+#include "studentlogin.h"
 #include "student.h"
+#include "course.h"
+#include "teacher.h"
+#include "teacherlist.h"
 #include "adminwindow.h"
 #include "studentwindow.h"
-// THIS IS THE DEFINITION of the extern:
-Course* courseHead = nullptr;
+#include "teacherwindow.h"
+
+StudentList students;
+Course*     courseHead = nullptr;
+TeacherList teachers;
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
-    StudentList students;
-    Course* courseHead = nullptr; //Raf: remove copy
+    // Seed initial data
+    teachers.addTeacher(new Teacher("t01", "123"));
 
+
+    // Main window
     QWidget window;
-    window.setWindowTitle("Course Registration System");
+    window.setWindowTitle("Course Registration");
+    window.setMinimumSize(500, 250);
+    window.resize(600, 300);
 
-    // set a reasonable overall size
-    window.setMinimumSize(400, 200);
-    window.resize(500, 250);
-
-    // create layout
     auto layout = new QVBoxLayout(&window);
+    auto adminB   = new QPushButton("Admin");
+    auto studentB = new QPushButton("Student");
+    auto teacherB = new QPushButton("Teacher");
+    QSize bs(120, 40);
+    adminB->setFixedSize(bs);
+    studentB->setFixedSize(bs);
+    teacherB->setFixedSize(bs);
 
-    // create buttons
-    auto adminButton   = new QPushButton("Admin");
-    auto studentButton = new QPushButton("Student");
+    layout->addStretch();
+    layout->addWidget(adminB, 0, Qt::AlignHCenter);
+    layout->addWidget(studentB, 0, Qt::AlignHCenter);
+    layout->addWidget(teacherB, 0, Qt::AlignHCenter);
+    layout->addStretch();
 
-    // clamp button size
-    QSize btnSize(120, 40);
-    adminButton  ->setFixedSize(btnSize);
-    studentButton->setFixedSize(btnSize);
+    // Create windows and dialogs
+    AdminWindow   aw(&students, &courseHead, &teachers);
+    StudentWindow sw(&students, &courseHead);
+    TeacherWindow tw(&teachers, &window);
+    StudentLoginDialog sdlg(&students, &courseHead);
 
-    // center them with stretches
-    layout->addStretch();              // top spacer
-    layout->addWidget(adminButton,   0, Qt::AlignHCenter);
-    layout->addSpacing(10);
-    layout->addWidget(studentButton, 0, Qt::AlignHCenter);
-    layout->addStretch();              // bottom spacer
-
-    // dialogs
-    AdminWindow   adminWindow(&students, &courseHead);
-    StudentWindow studentWindow(&students, &courseHead);
-
-    QObject::connect(adminButton, &QPushButton::clicked, [&](){
+    // Admin button → login
+    QObject::connect(adminB, &QPushButton::clicked, [&]() {
         bool ok;
-        QString pwd = QInputDialog::getText(&window,
-                                            "Admin Login", "Password:",
+        QString pwd = QInputDialog::getText(&window, "Admin Login", "Password:",
                                             QLineEdit::Password, "", &ok);
-        if (ok && pwd == "admin123") adminWindow.show();
-        else if (ok) QMessageBox::warning(&window, "Error", "Incorrect password");
+        if (ok && pwd == "admin123")
+            aw.show();
+        else if (ok)
+            QMessageBox::warning(&window, "Error", "Wrong password");
     });
-    QObject::connect(studentButton, &QPushButton::clicked, [&](){
-        studentWindow.show();
+
+    // Student button → login dialog
+    QObject::connect(studentB, &QPushButton::clicked, [&]() {
+        sdlg.exec();
+    });
+
+    // Teacher button → login dialog
+    QObject::connect(teacherB, &QPushButton::clicked, [&]() {
+        if (tw.login())
+            tw.show();
     });
 
     window.show();
